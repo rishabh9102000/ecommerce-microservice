@@ -9,4 +9,4 @@ using Spring Boot microservices.
 - payment-service (port 8082)
 - notification-service (port 8083)
 
-## Full documentation coming after completion
+## Full documentation coming after completion.
