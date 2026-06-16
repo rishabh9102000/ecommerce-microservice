@@ -9,24 +9,26 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.Random;
 
 @Slf4j
-public class UpiPaymentStrategy implements PaymentStrategy{
+public class CreditCardPaymentStrategy implements PaymentStrategy {
+
     @Override
     public PaymentResponse processPayment(PaymentRequest request) {
-
+        log.info("Using Credit for payment");
         boolean isSuccess = new Random().nextInt(100) < 70;
         PaymentResponse response =null;
         if (isSuccess) {
             response= PaymentResponse.builder()
                     .amount(request.getAmount())
                     .status(Status.SUCCESS)
-                    .message("UPI payment success")
+                    .message("Credit payment success")
                     .build();
             // return SUCCESS response
-            log.info("UPI payment successful for orderId: {}", request.getOrderId());
+            log.info("Credit payment successful for orderId: {}", request.getOrderId());
 
         } else {
-            log.warn("UPI payment failed for orderId: {}", request.getOrderId());
-            throw new PaymentFailedException("UPI payment failed for orderId: " + request.getOrderId());
+            log.warn("Credit payment failed for orderId: {}", request.getOrderId());
+
+            throw new PaymentFailedException("Credit payment failed for orderId: " + request.getOrderId());
 
             // throw PaymentFailedException
         }
