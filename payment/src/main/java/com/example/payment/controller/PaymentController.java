@@ -20,7 +20,7 @@ public class PaymentController {
 
     @PostMapping("/api/payment")
     public ResponseEntity<PaymentResponse> processPayment(@RequestBody PaymentRequest request){
-        log.info("Request recieved for payment");
+        log.info("Request received for payment");
         PaymentResponse response = service.processPayment(request);
         return ResponseEntity.ok(response);
     }

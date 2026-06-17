@@ -19,7 +19,7 @@ public class Order {
     @Builder.Default
     private String orderId = UUID.randomUUID().toString();
     private  String productId;
-    private Status status;
+    private OrderStatus status;
     private String userId;
     private int quantity;
     @Builder.Default

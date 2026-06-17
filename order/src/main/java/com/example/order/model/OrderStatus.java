@@ -1,6 +1,6 @@
 package com.example.order.model;
 
-public enum Status {
+public enum OrderStatus {
     CREATED,
     CONFIRMED,
     FAILED
