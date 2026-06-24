@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 @RestController
 @Slf4j
 public class OrderController {
@@ -24,8 +26,10 @@ public class OrderController {
 
     @PostMapping("/api/orders")
     public ResponseEntity<Order> createOrder(@Valid @RequestBody  OrderDto dto){
-        log.info("Received order request for productId: {}", dto.getProductId());
-        Order order = orderService.createOrder(dto);
+        String correlationId = UUID.randomUUID().toString();
+        log.info("[correlationId={}] Received order request for productId: {}", correlationId, dto.getProductId());
+
+        Order order = orderService.createOrder(dto,correlationId);
         return ResponseEntity.ok(order);
 
     }

@@ -19,8 +19,10 @@ public class PaymentController {
     }
 
     @PostMapping("/api/payment")
-    public ResponseEntity<PaymentResponse> processPayment(@RequestBody PaymentRequest request){
-        log.info("Request received for payment");
+    public ResponseEntity<PaymentResponse> processPayment(@RequestBody PaymentRequest request,
+                                                          @RequestHeader(value = "X-Correlation-ID", required = false) String correlationId){
+
+        log.info("[correlationId={}] Request received to process payment for user{}", correlationId, request.getUserId());
         PaymentResponse response = service.processPayment(request);
         return ResponseEntity.ok(response);
     }

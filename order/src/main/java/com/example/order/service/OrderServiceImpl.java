@@ -35,14 +35,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Order createOrder(OrderDto dto) {
+    public Order createOrder(OrderDto dto,String correlationId) {
         Order order = Order.builder()
                 .productId(dto.getProductId())
                 .status(OrderStatus.CREATED)
                 .quantity(dto.getQuantity())
                 .userId(dto.getUserId())
                 .build();
-        log.info("Order created with orderid : {}" ,order.getOrderId());
+        log.info("[correlationId={}] Order created with orderId: {}", correlationId, order.getOrderId());
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .orderId(order.getOrderId())
                 .userId(dto.getUserId())
@@ -60,20 +60,23 @@ public class OrderServiceImpl implements OrderService {
 
         CompletableFuture<Void> orderFuture = CompletableFuture
                 .supplyAsync(() -> {
-                    log.info("Inventory Running on thread: {}", Thread.currentThread().getName());
-                    return inventoryClient.checkAvailability(dto.getProductId(), dto.getQuantity());
+
+                    log.info("[correlationId={}] Inventory Running on thread: {}", correlationId, Thread.currentThread().getName());
+                    return inventoryClient.checkAvailability(dto.getProductId(), dto.getQuantity(),correlationId);
                 }, orderProcessingExecutor)
                 .thenApplyAsync(inventoryResponse -> {
-                    log.info("Payment Running on thread: {}", Thread.currentThread().getName());
+                    log.info("[correlationId={}] Payment Running on thread: {}", correlationId, Thread.currentThread().getName());
                     // call paymentClient here, return paymentResponse
-                    return paymentClient.processPayment(paymentRequest);
+                    return paymentClient.processPayment(paymentRequest,correlationId);
                 }, orderProcessingExecutor)
                 .thenAcceptAsync(paymentResponse -> {
                     // call notificationClient here
-                    log.info(" notification Running on thread: {}", Thread.currentThread().getName());
+                    log.info("[correlationId={}] Notification Running on thread: {}", correlationId, Thread.currentThread().getName());
                     order.setStatus(OrderStatus.CONFIRMED);
-                    log.info("Notification response: {}", notificationClient.processNotification(notificationRequest));
+//                    log.info("Notification response: {}", notificationClient.processNotification(notificationRequest,correlationId));
                     // update order status to CONFIRMED
+                    log.info("[correlationId={}] Notification response: {}", correlationId,
+                            notificationClient.processNotification(notificationRequest, correlationId));
                 }, orderProcessingExecutor)
                 .exceptionally(ex -> {
                     // update order status to FAILED
