@@ -1,10 +1,10 @@
 package com.example.order.service;
 
 import com.example.order.client.InventoryClient;
-import com.example.order.client.NotificationClient;
-import com.example.order.client.PaymentClient;
+
 import com.example.order.dto.*;
 import com.example.order.exception.OrderException;
+import com.example.order.kafka.PaymentEventProducer;
 import com.example.order.model.Order;
 import com.example.order.model.OrderStatus;
 import lombok.extern.slf4j.Slf4j;
@@ -21,17 +21,17 @@ import java.util.concurrent.ExecutorService;
 public class OrderServiceImpl implements OrderService {
 
     private final InventoryClient inventoryClient;
-    private final PaymentClient paymentClient;
-    private final NotificationClient notificationClient;
-    private final ExecutorService orderProcessingExecutor;
 
-    public OrderServiceImpl(InventoryClient inventoryClient, PaymentClient paymentClient,
-                            NotificationClient notificationClient,
+    private final ExecutorService orderProcessingExecutor;
+    private final PaymentEventProducer paymentEventProducer;
+
+    public OrderServiceImpl(InventoryClient inventoryClient,PaymentEventProducer paymentEventProducer,
+
                             @Qualifier("orderProcessingExecutor")ExecutorService orderProcessingExecutor) {
         this.inventoryClient = inventoryClient;
-        this.paymentClient = paymentClient;
-        this.notificationClient = notificationClient;
+
         this.orderProcessingExecutor = orderProcessingExecutor;
+        this.paymentEventProducer = paymentEventProducer;
     }
 
     @Override
@@ -43,7 +43,9 @@ public class OrderServiceImpl implements OrderService {
                 .userId(dto.getUserId())
                 .build();
         log.info("[correlationId={}] Order created with orderId: {}", correlationId, order.getOrderId());
-        PaymentRequest paymentRequest = PaymentRequest.builder()
+
+
+        PaymentRequestEvent paymentRequestEvent = PaymentRequestEvent.builder()
                 .orderId(order.getOrderId())
                 .userId(dto.getUserId())
                 .paymentMode(PaymentMode.UPI)
@@ -52,11 +54,8 @@ public class OrderServiceImpl implements OrderService {
                 .amount(500.0)
                 .build();
 
-        NotificationRequest notificationRequest = NotificationRequest.builder()
-                .userId(dto.getUserId())
-                .message("Order Placed successfully with orderid :  " + order.getOrderId())
-                .type(NotificationType.SMS)
-                .build();
+
+
 
         CompletableFuture<Void> orderFuture = CompletableFuture
                 .supplyAsync(() -> {
@@ -64,23 +63,18 @@ public class OrderServiceImpl implements OrderService {
                     log.info("[correlationId={}] Inventory Running on thread: {}", correlationId, Thread.currentThread().getName());
                     return inventoryClient.checkAvailability(dto.getProductId(), dto.getQuantity(),correlationId);
                 }, orderProcessingExecutor)
-                .thenApplyAsync(inventoryResponse -> {
-                    log.info("[correlationId={}] Payment Running on thread: {}", correlationId, Thread.currentThread().getName());
+                .thenAcceptAsync(inventoryResponse -> {
+                    log.info("[correlationId={}] Publishing payment event on thread: {}", correlationId, Thread.currentThread().getName());
                     // call paymentClient here, return paymentResponse
-                    return paymentClient.processPayment(paymentRequest,correlationId);
-                }, orderProcessingExecutor)
-                .thenAcceptAsync(paymentResponse -> {
-                    // call notificationClient here
-                    log.info("[correlationId={}] Notification Running on thread: {}", correlationId, Thread.currentThread().getName());
+                    paymentEventProducer.publishPaymentRequest(paymentRequestEvent,correlationId);
                     order.setStatus(OrderStatus.CONFIRMED);
-//                    log.info("Notification response: {}", notificationClient.processNotification(notificationRequest,correlationId));
-                    // update order status to CONFIRMED
-                    log.info("[correlationId={}] Notification response: {}", correlationId,
-                            notificationClient.processNotification(notificationRequest, correlationId));
+
                 }, orderProcessingExecutor)
+
                 .exceptionally(ex -> {
                     // update order status to FAILED
                     // throw OrderException
+                    log.error("[correlationId={}] Order failed with exception: {}", correlationId, ex.getMessage(), ex);
                     order.setStatus(OrderStatus.FAILED);
                     throw new OrderException("Order not accepted for user :" + dto.getUserId());
                 });
